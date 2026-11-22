@@ -1,0 +1,35 @@
+{
+  "name": "padhai-study-room",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env server/dev.mjs",
+    "start": "node --env-file-if-exists=.env server/index.mjs",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "node --import tsx --test src/lib/*.test.ts server/*.test.mjs",
+    "test:e2e": "node --test tests/browser.test.mjs"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.2.1",
+    "lucide-react": "latest",
+    "nodemailer": "^10.6.1",
+    "pdf-lib": "^1.17.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "trystero": "latest",
+    "unpdf": "^1.7.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "latest",
+    "@types/node": "latest",
+    "@types/nodemailer": "^8.0.2",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "tsx": "latest",
+    "typescript": "^5.9.3",
+    "vite": "latest"
+  }
+}

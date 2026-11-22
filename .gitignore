@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.vercel/
+.env*
+!.env.example
+*.tsbuildinfo
+test-results/
+playwright-report/
+data/
+server/database.private.json
+public/padhai-source.zip
+public/padhai-source.tar.gz

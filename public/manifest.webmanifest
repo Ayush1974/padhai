@@ -1,0 +1,29 @@
+{
+  "id": "/",
+  "name": "Padhai — Study Together",
+  "short_name": "Padhai",
+  "description": "Your free, calm study space. Focus, plan, and study together.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f5fc",
+  "theme_color": "#6330d9",
+  "categories": [
+    "education",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
