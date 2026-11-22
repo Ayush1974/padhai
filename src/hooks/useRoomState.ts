@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type { Message, PeerProfile, Profile, StudyRoom } from "../types";
 import { api, cloudIdentity } from "../lib/cloud";
+import type { CallInbox } from "../lib/roomCall";
 
 export interface SharedClock {
   endAt: number | null;
@@ -13,12 +14,14 @@ interface Snapshot {
   clock: SharedClock;
   revision: number;
   messages: Message[];
+  signals?: Parameters<CallInbox["receive"]>[0];
 }
 
 export function useRoomState(
   room: StudyRoom,
   profile: Profile,
   notify: (message: string) => void,
+  call: RefObject<CallInbox | null>,
 ) {
   const [selfId] = useState(() => crypto.randomUUID());
   const [state, setState] = useState<Snapshot>({
@@ -62,6 +65,7 @@ export function useRoomState(
     let timeout: ReturnType<typeof setTimeout>;
     let controller: AbortController | undefined;
     let token = "";
+    let expectedPeers = 0;
     void cloudIdentity()
       .then((identity) => {
         token = identity.token;
@@ -86,9 +90,14 @@ export function useRoomState(
             exam: current.exam,
             goal: goal.current,
             minutes: room.minutes,
+            ...call.current?.request(),
           }),
         });
-        if (!stopped) apply(data);
+        if (!stopped) {
+          apply(data);
+          expectedPeers = Math.max(0, Object.keys(data.members).length - 1);
+          if (data.signals) call.current?.receive(data.signals);
+        }
       } catch (error) {
         if (!stopped) {
           setReady(false);
@@ -98,11 +107,10 @@ export function useRoomState(
         }
       } finally {
         inFlight = false;
-        if (!stopped)
-          timeout = setTimeout(
-            () => void refresh(),
-            document.hidden ? 12000 : 3500,
-          );
+        if (!stopped) {
+          const connecting = call.current && call.current.connectedPeers() < expectedPeers;
+          timeout = setTimeout(() => void refresh(), document.hidden ? 12000 : connecting ? 2000 : 3500);
+        }
       }
     }
     function leave() {
@@ -128,7 +136,7 @@ export function useRoomState(
       window.removeEventListener("pagehide", leave);
       document.removeEventListener("visibilitychange", visible);
     };
-  }, [room.id, room.minutes, selfId, apply]);
+  }, [room.id, room.minutes, selfId, apply, call]);
   useEffect(() => refreshRef.current(), [profile.name, profile.exam]);
 
   async function sendMessage(text: string) {

@@ -343,7 +343,7 @@ test(
 );
 
 test(
-  "room invite, roster, chat and shared clock work even when peer relays are blocked",
+  "room invite, live video and audio, chat and shared clock work without public signaling relays",
   { timeout: 110000 },
   async () => {
     const browser = await chromium.launch({
@@ -362,8 +362,46 @@ test(
         "microphone",
       ],
     });
-    const second = await browser.newContext();
+    const second = await browser.newContext({
+      permissions: ["camera", "microphone"],
+    });
+    await first.routeWebSocket("**/*", (socket) => socket.close());
     await second.routeWebSocket("**/*", (socket) => socket.close());
+    const statuses = [];
+    for (const context of [first, second]) {
+      await context.addInitScript(() => {
+        const devices = navigator.mediaDevices;
+        const capture = devices.getUserMedia.bind(devices);
+        devices.getUserMedia = async (constraints) => {
+          if (!constraints.audio || constraints.video) return capture(constraints);
+          // Each page gets its own microphone tone so the shared test device cannot mute a tab.
+          const audio = new AudioContext();
+          const source = audio.createOscillator();
+          const destination = audio.createMediaStreamDestination();
+          source.frequency.value = 440;
+          source.connect(destination);
+          source.start();
+          await audio.resume();
+          return destination.stream;
+        };
+        const Peer = window.RTCPeerConnection;
+        window.testRoomPeers = [];
+        window.RTCPeerConnection = class extends Peer {
+          constructor(...args) {
+            super(...args);
+            window.testRoomPeers.push(this);
+          }
+        };
+      });
+      context.on("response", (response) => {
+        if (response.url().includes("/signals"))
+          statuses.push(response.request().method() + " " + response.status());
+        if (response.url().includes("/presence") && response.request().method() === "PUT")
+          void response.json().then((data) => {
+            if (data.signals?.length) statuses.push("received " + data.signals.length);
+          }).catch(() => {});
+      });
+    }
     try {
       const a = await first.newPage();
       const b = await second.newPage();
@@ -436,45 +474,80 @@ test(
         Math.abs(after.y - before) <= 1,
         JSON.stringify({ before, after }),
       );
-      const third = await browser.newContext({
-        permissions: ["camera", "microphone"],
-      });
-      const c = await third.newPage();
+      for (const page of [a, b]) {
+        await page.getByRole("button", { name: "Turn camera on", exact: true }).click();
+        await page.getByRole("button", { name: "Turn microphone on", exact: true }).click();
+      }
       try {
-        await openWorkspace(c, "Camera Student", link);
-        await a
-          .getByRole("button", { name: "Turn camera on", exact: true })
-          .click();
-        await c
-          .getByRole("button", { name: "Turn camera on", exact: true })
-          .click();
-        await a
-          .locator(".participant:not(.is-you) video")
-          .waitFor({ timeout: 45000 });
-        await c
-          .locator(".participant:not(.is-you) video")
-          .waitFor({ timeout: 45000 });
-        await a
-          .getByRole("button", { name: "Turn microphone on", exact: true })
-          .click();
-        await c.locator("video.audio-only").waitFor({ timeout: 15000 });
-        assert.ok(
-          await c
-            .locator(".participant:not(.is-you) video")
-            .evaluate((video) =>
-              video.srcObject
-                .getVideoTracks()
-                .some((track) => track.readyState === "live"),
-            ),
+        await Promise.all([a, b].map(async (page) => {
+          await page.waitForFunction(async () => {
+            const camera = document.querySelector(".participant:not(.is-you) video");
+            const audio = document.querySelector(".audio-only");
+            const playing = camera?.videoWidth > 0 && camera.readyState >= 2 &&
+              !audio?.paused && !audio?.muted &&
+              audio?.srcObject?.getAudioTracks().some((track) => !track.muted && track.readyState === "live");
+            if (!playing) return false;
+            const peers = window.testRoomPeers.filter((peer) => peer.connectionState === "connected");
+            const reports = await Promise.all(peers.map((peer) => peer.getStats()));
+            return reports.some((stats) => [...stats.values()].some((report) =>
+              report.type === "inbound-rtp" && report.kind === "audio" && report.packetsReceived > 0,
+            ));
+          }, undefined, { timeout: 20000 });
+        }));
+      } catch (error) {
+        const diagnostics = await Promise.all([a, b].map((page) => page.evaluate(async () => {
+          const peers = await Promise.all(window.testRoomPeers.map(async (peer) => ({
+            connection: peer.connectionState, ice: peer.iceConnectionState,
+            tracks: peer.getTransceivers().map(({ currentDirection, sender, receiver }) => ({
+              direction: currentDirection, kind: receiver.track.kind,
+              local: sender.track?.readyState, remoteMuted: receiver.track.muted,
+            })),
+            audioPackets: [...(await peer.getStats()).values()]
+              .filter((report) => report.kind === "audio" && /^(in|out)bound-rtp$/.test(report.type))
+              .map(({ type, packetsSent, packetsReceived }) => ({ type, packetsSent, packetsReceived })),
+          })));
+          return { status: document.querySelector(".room-connection-note")?.textContent, peers };
+        })));
+        throw new Error(JSON.stringify({ statuses, diagnostics }), { cause: error });
+      }
+      await a.getByRole("button", { name: "Mute room audio", exact: true }).click();
+      await a.waitForFunction(() => document.querySelector(".audio-only")?.muted);
+      await a.getByRole("button", { name: "Unmute room audio", exact: true }).click();
+      await a.waitForFunction(() => {
+        const audio = document.querySelector(".audio-only");
+        return audio && !audio.paused && !audio.muted;
+      });
+      await a.getByRole("button", { name: "Turn camera off", exact: true }).click();
+      await b.locator(".participant:not(.is-you) video").waitFor({ state: "detached", timeout: 10000 });
+      await a.getByRole("button", { name: "Turn camera on", exact: true }).click();
+      await b.waitForFunction(() => document.querySelector(".participant:not(.is-you) video")?.videoWidth > 0);
+
+      for (const width of [320, 360, 390]) {
+        await b.setViewportSize({ width, height: 680 });
+        const widgets = b.locator(".room-layout .study-widgets");
+        const cards = await widgets.evaluate((aside) => {
+          const timer = aside.querySelector(".timer-panel").getBoundingClientRect();
+          const sound = aside.querySelector(".sound-panel").getBoundingClientRect();
+          return { timerRight: timer.right, timerBottom: timer.bottom,
+            soundLeft: sound.left, soundRight: sound.right, soundTop: sound.top,
+            pageWidth: document.documentElement.scrollWidth };
+        });
+        assert.ok(cards.timerRight <= width && cards.soundRight <= width &&
+          cards.soundLeft >= 0 && cards.soundTop >= cards.timerBottom && cards.pageWidth <= width,
+          `The focus and sound cards must stack at ${width}px: ${JSON.stringify(cards)}`);
+        await widgets.getByRole("button", { name: "Expand focus timer", exact: true }).click();
+        const dialog = b.getByRole("dialog");
+        const labelFits = await dialog.locator(".sound-options > button").evaluateAll((buttons) =>
+          buttons.every((button) => {
+            const range = document.createRange();
+            range.selectNodeContents(button.querySelector("span"));
+            const label = range.getBoundingClientRect();
+            const tile = button.getBoundingClientRect();
+            return label.left >= tile.left - 1 && label.right <= tile.right + 1;
+          }),
         );
-        await a
-          .getByRole("button", { name: "Turn camera off", exact: true })
-          .click();
-        await a
-          .locator(".participant.is-you video")
-          .waitFor({ state: "detached" });
-      } finally {
-        await third.close();
+        assert.ok(labelFits, `Sound labels are clipped in Focus at ${width}px`);
+        await dialog.getByRole("button", { name: "Back to your study space" }).click();
       }
     } finally {
       await first.close();

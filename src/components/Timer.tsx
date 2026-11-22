@@ -141,7 +141,7 @@ export function Timer({
             "Reset and save the current session before changing its subject.",
           )}
           value={focus.timer.subject}
-          placeholder={t("Choose a subject or write your own\u2026")}
+          placeholder={t("Choose or type a subject")}
           onChange={(event) => focus.setSubject(event.target.value)}
         />
         <datalist id={compact ? "focus-subjects-compact" : "focus-subjects"}>

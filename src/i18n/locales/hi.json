@@ -161,5 +161,15 @@
   "Back to sign in": "साइन इन पर वापस जाएँ",
   "Choose a new password": "नया पासवर्ड चुनें",
   "New password": "नया पासवर्ड",
-  "Reset password & sign in": "पासवर्ड बदलें और साइन इन करें"
+  "Reset password & sign in": "पासवर्ड बदलें और साइन इन करें",
+  "Choose or type a subject": "विषय चुनें या लिखें",
+  "Enable room sound": "कमरे की आवाज़ चालू करें",
+  "Turn sound on": "आवाज़ चालू करें",
+  "Room sound on": "कमरे की आवाज़ चालू है",
+  "Connecting the room call…": "कमरे की कॉल जुड़ रही है…",
+  "Live call connected": "लाइव कॉल जुड़ गई है",
+  "Room call is ready. Turn on your camera or microphone when you’re ready.": "कमरे की कॉल तैयार है। जब आप तैयार हों, कैमरा या माइक्रोफ़ोन चालू करें।",
+  "The room call is reconnecting. Keep the room open on both devices.": "कमरे की कॉल दोबारा जुड़ रही है। दोनों डिवाइस पर कमरा खुला रखें।",
+  "This browser cannot make a room call. Try Chrome, Edge, or Safari.": "इस ब्राउज़र में कमरे की कॉल नहीं चल सकती। Chrome, Edge या Safari आज़माएँ।",
+  "Your camera or microphone couldn’t connect. Try turning it off and on.": "कैमरा या माइक्रोफ़ोन जुड़ नहीं सका। उसे बंद करके दोबारा चालू करें।"
 }

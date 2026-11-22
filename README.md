@@ -24,7 +24,7 @@ A free, open-source study companion for Indian students. Built with ❤️ by Ay
 - With `PADHAI_RECOVERY_SECRET` configured, registration and successful password sign-in store a separate encrypted copy of the study key for email recovery. A verified reset link lets the server rewrap the same study key under the new password and revoke old sessions. An older account without this recovery copy needs its original private study backup key. Keep a secure backup of the server recovery secret.
 - A personal Gemini key is encrypted before saving. **A saved personal key always takes priority. A failed personal key never falls back to the app owner's key.** The key is decrypted only to send an AI request over HTTPS to the app's server, which forwards it to Google without saving it in plaintext.
 - Gemini receives content submitted for AI features. The assistant includes the exam, subject names, targets, and seven-day study totals. PDF analysis sends the selected PDF. Wisdom explanations use public verse text and the selected language. Google free-tier data terms apply.
-- Room membership, names, intentions, chat, and the shared clock use authenticated server APIs so they still work when peer discovery is blocked. Recent chat is stored on the server for up to 24 hours or 100 messages. Avoid putting private information in room chat. Explicitly enabled camera, audio, and screen sharing use encrypted WebRTC and public discovery relays; peers may learn network addresses. Each browser tab uses a separate call identity.
+- Room membership, names, chat, intentions, the shared clock, and call setup use the authenticated Padhai API. Connection messages expire after 45 seconds. Camera, microphone, and screen sharing use encrypted WebRTC. Peers may learn each other’s network addresses. Each browser tab uses a separate call identity. Recent chat is stored on the server for up to 24 hours or 100 messages.
 - Workspace JSON backups contain note text and attachment references. Download important attachments separately. Shared note copies use a separate encryption key in the URL fragment. The full link gives a signed-in recipient access to the shared title and text.
 - Simultaneous edits on two devices trigger a choice in Settings instead of silently overwriting one device's changes.
 
@@ -101,6 +101,7 @@ Run `npm run test:e2e` in a second terminal. The suite starts its own local API 
 | `PADHAI_RECOVERY_SECRET` | A stable 32-byte random key encoded as 64 hex characters for email account recovery. |
 | `PADHAI_PUBLIC_URL` | Origin used in reset emails. Set this for a fork or a custom domain. |
 | `CRON_SECRET` | Vercel's server-only secret for the daily Wisdom preparation job. |
+| `TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL` | Optional relay settings for browsers that cannot make a direct connection. Use comma-separated TURN URLs from your provider. Signed-in participants receive the client credentials when joining a call. |
 
 4. Deploy. `vercel.json` configures the serverless API and security headers. `/api/health` confirms storage connectivity.
 

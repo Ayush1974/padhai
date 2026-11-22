@@ -45,11 +45,18 @@ function Media({
   useEffect(() => {
     const media = element.current!;
     media.srcObject = stream;
-    void media.play().catch(() => setNeedsPlay(true));
     return () => {
       media.srcObject = null;
     };
   }, [stream]);
+  useEffect(() => {
+    let active = true;
+    void element.current?.play().then(
+      () => { if (active) setNeedsPlay(false); },
+      () => { if (active) setNeedsPlay(true); },
+    );
+    return () => { active = false; };
+  }, [stream, muted]);
   return (
     <>
       <video
@@ -64,11 +71,11 @@ function Media({
           <button
             className="media-play"
             onClick={() => {
-              void element.current?.play().then(() => setNeedsPlay(false));
+              void element.current?.play().then(() => setNeedsPlay(false)).catch(() => {});
             }}
           >
             <Volume2 size={15} />
-            {t(" Enable audio")}
+            {t(" Enable room sound")}
           </button>
         ),
       )}
@@ -242,7 +249,7 @@ export function RoomView({
             </label>
           </section>
 
-          <p className="room-connection-note">{t(live.mediaStatus)}</p>
+          <p className="room-connection-note" role="status">{t(live.mediaStatus)}</p>
           <section className="room-stage" aria-label={t("Study participants")}>
             <div className="stage-heading">
               <span>
@@ -272,7 +279,7 @@ export function RoomView({
                     >
                       {t(
                         camera && !profile.lowData ? (
-                          <Media stream={camera} muted={self || muted} />
+                          <Media stream={camera} muted />
                         ) : (
                           <div className="participant-placeholder">
                             <div
@@ -376,7 +383,7 @@ export function RoomView({
                       {t(live.members[stream.userId]?.name || "Student")}
                       {t("\u2019s screen")}
                     </span>
-                    <Media stream={stream.stream} muted={muted} />
+                    <Media stream={stream.stream} muted />
                   </div>
                 )),
             )}
@@ -386,7 +393,7 @@ export function RoomView({
                 disabled={
                   live.busyMedia ||
                   (!live.localStreams.camera &&
-                    (profile.lowData || !live.ready))
+                    (profile.lowData || !live.ready || !live.mediaReady))
                 }
                 onClick={() => void live.toggleMedia("camera")}
                 aria-label={
@@ -409,7 +416,7 @@ export function RoomView({
                 disabled={
                   live.busyMedia ||
                   (!live.localStreams.microphone &&
-                    (profile.lowData || !live.ready))
+                    (profile.lowData || !live.ready || !live.mediaReady))
                 }
                 onClick={() => void live.toggleMedia("microphone")}
                 aria-label={
@@ -432,7 +439,7 @@ export function RoomView({
                 disabled={
                   live.busyMedia ||
                   (!live.localStreams.screen &&
-                    (profile.lowData || !live.ready))
+                    (profile.lowData || !live.ready || !live.mediaReady))
                 }
                 onClick={() => void live.toggleMedia("screen")}
                 aria-label={
@@ -445,12 +452,23 @@ export function RoomView({
                 <span>{t("Share screen")}</span>
               </button>
               <button
-                className="media-control"
-                onClick={() => setMuted(!muted)}
-                aria-label={muted ? "Unmute room audio" : "Mute room audio"}
+                className={`media-control ${muted ? "" : "enabled"}`}
+                onClick={(event) => {
+                  setMuted(!muted);
+                  if (muted) {
+                    const players = event.currentTarget.closest(".room-stage")
+                      ?.querySelectorAll<HTMLVideoElement>(".audio-only");
+                    for (const player of players || []) {
+                      player.muted = false;
+                      void player.play().catch(() => {});
+                    }
+                  }
+                }}
+                aria-label={t(muted ? "Unmute room audio" : "Mute room audio")}
+                aria-pressed={!muted}
               >
                 {t(muted ? <VolumeX size={19} /> : <Volume2 size={19} />)}
-                <span>{t(muted ? "Unmute room" : "Room audio")}</span>
+                <span>{t(muted ? "Turn sound on" : "Room sound on")}</span>
               </button>
               <button className="leave-room" onClick={onLeave}>
                 {t("Leave room")}

@@ -94,7 +94,6 @@ export interface PeerProfile {
   exam: string;
   goal: string;
   roomId: string | null;
-  presenceId?: string;
 }
 
 export interface Message {

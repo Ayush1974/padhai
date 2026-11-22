@@ -82,6 +82,12 @@ export async function database(text, parameters = []) {
       await query(
         "CREATE INDEX IF NOT EXISTS room_messages_room ON room_messages (room_id, sent_at)",
       );
+      await query(
+        "CREATE TABLE IF NOT EXISTS room_signals (id TEXT PRIMARY KEY, room_id TEXT NOT NULL, sender_id TEXT NOT NULL, topic TEXT NOT NULL, message TEXT NOT NULL, sent_at BIGINT NOT NULL)",
+      );
+      await query(
+        "CREATE INDEX IF NOT EXISTS room_signals_room_topic ON room_signals (room_id, topic, sent_at)",
+      );
       await query("DELETE FROM request_limits WHERE expires_at < ?", [
         Date.now(),
       ]);

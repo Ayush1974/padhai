@@ -571,3 +571,62 @@
 .study-key-details > button {
   margin-top: 10px;
 }
+
+.sound-options > button > span {
+  max-inline-size: 100%;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.15;
+}
+
+.room-stage > .media-play {
+  position: static;
+  margin-top: 10px;
+}
+
+@media (max-width: 720px) {
+  .room-layout .study-widgets {
+    grid-template-columns: minmax(0, 1fr);
+    min-inline-size: 0;
+  }
+
+  .study-widgets > *,
+  .volume-slider input {
+    min-inline-size: 0;
+  }
+
+  .timer-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .timer-tabs > button,
+  .timer-controls .timer-start {
+    min-inline-size: 0;
+    padding-inline: 6px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .timer-dial {
+    max-inline-size: 100%;
+  }
+
+  .zen-space > h2 {
+    overflow-wrap: anywhere;
+  }
+
+  .zen-space > p {
+    margin-block: 18px;
+  }
+
+  .zen-space .sound-panel {
+    margin-block: 16px;
+    padding-inline: clamp(10px, 4vw, 18px);
+  }
+
+  .zen-space .sound-options {
+    gap: 6px;
+  }
+}
