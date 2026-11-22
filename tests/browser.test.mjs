@@ -369,9 +369,19 @@ test(
       permissions: ["camera", "microphone"],
     });
     const statuses = [];
+    const relayOnly = process.env.PADHAI_TEST_RELAY_ONLY === "1";
     for (const context of [first, second, third]) {
       await context.routeWebSocket("**/*", (socket) => socket.close());
-      await context.addInitScript(() => {
+      await context.route("**/api/rooms/*/signals", async (route) => {
+        if (route.request().method() === "POST") {
+          const { message } = route.request().postDataJSON();
+          const signal = typeof message === "string" ? JSON.parse(message) : message;
+          // Separate HTTP requests can deliver candidates before their offer on a slow network.
+          if (signal?.offer) await new Promise((resolve) => setTimeout(resolve, 3200));
+        }
+        await route.continue();
+      });
+      await context.addInitScript((relayOnly) => {
         const devices = navigator.mediaDevices;
         const capture = devices.getUserMedia.bind(devices);
         devices.getUserMedia = async (constraints) => {
@@ -389,12 +399,12 @@ test(
         const Peer = window.RTCPeerConnection;
         window.testRoomPeers = [];
         window.RTCPeerConnection = class extends Peer {
-          constructor(...args) {
-            super(...args);
+          constructor(configuration) {
+            super(relayOnly ? { ...configuration, iceTransportPolicy: "relay" } : configuration);
             window.testRoomPeers.push(this);
           }
         };
-      });
+      }, relayOnly);
       context.on("response", (response) => {
         if (response.url().includes("/signals"))
           statuses.push(response.request().method() + " " + response.status());
@@ -492,7 +502,7 @@ test(
       await c.getByRole("button", { name: "Turn microphone on", exact: true }).click();
       try {
         await Promise.all([a, b, c].map(async (page) => {
-          await page.waitForFunction(async () => {
+          await page.waitForFunction(async (relayOnly) => {
             const cameras = [...document.querySelectorAll(".participant:not(.is-you) video")];
             const microphones = [...document.querySelectorAll(".audio-only")];
             const playing = cameras.length === 2 && microphones.length === 2 &&
@@ -502,10 +512,17 @@ test(
             if (!playing) return false;
             const peers = window.testRoomPeers.filter((peer) => peer.connectionState === "connected");
             const reports = await Promise.all(peers.map((peer) => peer.getStats()));
-            return reports.filter((stats) => [...stats.values()].some((report) =>
-              report.type === "inbound-rtp" && report.kind === "audio" && report.packetsReceived > 0,
-            )).length === 2;
-          }, undefined, { timeout: 20000 });
+            return reports.filter((stats) => {
+              const entries = [...stats.values()];
+              if (relayOnly) {
+                const pair = stats.get(entries.find((report) => report.selectedCandidatePairId)?.selectedCandidatePairId);
+                if (stats.get(pair?.localCandidateId)?.candidateType !== "relay") return false;
+              }
+              return entries.some((report) =>
+                report.type === "inbound-rtp" && report.kind === "audio" && report.packetsReceived > 0,
+              );
+            }).length === 2;
+          }, relayOnly, { timeout: 25000 });
         }));
       } catch (error) {
         const diagnostics = await Promise.all([a, b, c].map((page) => page.evaluate(async () => {
@@ -572,6 +589,7 @@ test(
         assert.ok(labelFits, `Sound labels are clipped in Focus at ${width}px`);
         await dialog.getByRole("button", { name: "Back to your study space" }).click();
       }
+      assert.ok(!statuses.includes("POST 429"), "Delayed offers should not exhaust the room's signaling limit");
     } finally {
       await first.close();
       await second.close();

@@ -54,6 +54,8 @@ export function createRoomCall(
     appId: "padhai-room-media-v3",
     identity: "none",
     maxUsers: 8,
+    // Keep candidates in the offer and answer so separate HTTP requests can't reorder them.
+    trickleIce: false,
     rtcConfig: { iceServers },
   }, roomId);
   return { room, inbox };
