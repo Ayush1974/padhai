@@ -4,8 +4,9 @@ import { randomUUID } from "node:crypto";
 import { roomRequest } from "./rooms.mjs";
 import { database } from "./db.mjs";
 
-test("room members, chat and clock work without a peer connection and enforce ownership", async () => {
+test("room members share one saved kMeet link and can use chat and the clock", async () => {
   const id = "room-" + randomUUID();
+  const otherRoom = "room-" + randomUUID();
   const a = randomUUID(),
     b = randomUUID();
   const query = new URLSearchParams();
@@ -35,23 +36,19 @@ test("room members, chat and clock work without a peer connection and enforce ow
       query,
     );
     assert.equal(Object.keys(second.members).length, 2);
-    const topic = "test-room-calls-topic";
-    const packet = { topic, message: { peerId: "test-peer" } };
     await assert.rejects(
-      roomRequest("owner-b", id, "signals", "POST", { memberId: a, ...packet }, query),
+      roomRequest("owner-b", id, "call", "POST", { memberId: a }, query),
       { status: 403 },
     );
-    await roomRequest("owner-a", id, "signals", "POST", { memberId: a, ...packet }, query);
-    const polling = { ...profile, signalTopics: [topic], readSignals: [] };
-    const sender = await roomRequest("owner-a", id, "presence", "PUT", { ...polling, memberId: a }, query);
-    assert.deepEqual(sender.signals, []);
-    const secondPoll = { ...polling, name: "Second Student", memberId: b };
-    const recipient = await roomRequest("owner-b", id, "presence", "PUT", secondPoll, query);
-    assert.equal(recipient.signals.length, 1);
-    assert.deepEqual(recipient.signals[0].message, packet.message);
-    const next = await roomRequest("owner-b", id, "presence", "PUT",
-      { ...secondPoll, readSignals: [recipient.signals[0].id] }, query);
-    assert.deepEqual(next.signals, []);
+    const [firstCall, secondCall] = await Promise.all([
+      roomRequest("owner-a", id, "call", "POST", { memberId: a }, query),
+      roomRequest("owner-b", id, "call", "POST", { memberId: b }, query),
+    ]);
+    assert.match(firstCall.url, /^https:\/\/kmeet\.infomaniak\.com\/[a-f0-9]{32}$/);
+    assert.equal(secondCall.url, firstCall.url);
+    await roomRequest("owner-a", otherRoom, "presence", "PUT", { ...profile, memberId: a }, query);
+    const otherCall = await roomRequest("owner-a", otherRoom, "call", "POST", { memberId: a }, query);
+    assert.notEqual(otherCall.url, firstCall.url);
     await assert.rejects(
       roomRequest(
         "owner-b",
@@ -100,6 +97,10 @@ test("room members, chat and clock work without a peer connection and enforce ow
       {},
       new URLSearchParams({ memberId: b }),
     );
+    await assert.rejects(
+      roomRequest("owner-b", id, "call", "POST", { memberId: b }, query),
+      { status: 403 },
+    );
     const remaining = await roomRequest(
       "owner-a",
       id,
@@ -129,9 +130,9 @@ test("room members, chat and clock work without a peer connection and enforce ow
       ),
     );
   } finally {
-    await database("DELETE FROM room_members WHERE room_id = ?", [id]);
+    await database("DELETE FROM room_members WHERE room_id IN (?, ?)", [id, otherRoom]);
     await database("DELETE FROM room_messages WHERE room_id = ?", [id]);
-    await database("DELETE FROM room_signals WHERE room_id = ?", [id]);
-    await database("DELETE FROM study_rooms WHERE id = ?", [id]);
+    await database("DELETE FROM room_calls WHERE room_id IN (?, ?)", [id, otherRoom]);
+    await database("DELETE FROM study_rooms WHERE id IN (?, ?)", [id, otherRoom]);
   }
 });

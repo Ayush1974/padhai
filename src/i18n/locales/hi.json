@@ -175,5 +175,14 @@
   "Room call is ready. Turn on your camera or microphone when you’re ready.": "कमरे की कॉल तैयार है। जब आप तैयार हों, कैमरा या माइक्रोफ़ोन चालू करें।",
   "The room call is reconnecting. Keep the room open on both devices.": "कमरे की कॉल दोबारा जुड़ रही है। दोनों डिवाइस पर कमरा खुला रखें।",
   "This browser cannot make a room call. Try Chrome, Edge, or Safari.": "इस ब्राउज़र में कमरे की कॉल नहीं चल सकती। Chrome, Edge या Safari आज़माएँ।",
-  "Your camera or microphone couldn’t connect. Try turning it off and on.": "कैमरा या माइक्रोफ़ोन जुड़ नहीं सका। उसे बंद करके दोबारा चालू करें।"
+  "Your camera or microphone couldn’t connect. Try turning it off and on.": "कैमरा या माइक्रोफ़ोन जुड़ नहीं सका। उसे बंद करके दोबारा चालू करें।",
+  "Join video call": "वीडियो कॉल में जुड़ें",
+  "Opening video call…": "वीडियो कॉल खुल रही है…",
+  "Close video call": "वीडियो कॉल बंद करें",
+  "kMeet study call": "kMeet अध्ययन कॉल",
+  "Students in this room": "इस कमरे के विद्यार्थी",
+  "Chat hidden for you": "आपके लिए चैट छिपाई गई है",
+  "Hide this student's Padhai chat": "इस विद्यार्थी की Padhai चैट छिपाएँ",
+  "Turn off low-data mode in Settings to join the video call.": "वीडियो कॉल में जुड़ने के लिए सेटिंग में कम डेटा मोड बंद करें।",
+  "Choose the browser option in kMeet, then enter your name. Everyone in this study room joins the same call.": "kMeet में ब्राउज़र से जुड़ने का विकल्प चुनें और अपना नाम लिखें। इस अध्ययन कक्ष के सभी विद्यार्थी एक ही कॉल में जुड़ते हैं।"
 }

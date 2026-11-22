@@ -167,7 +167,7 @@ export default async function handler(request, response) {
       return;
     }
     const roomMatch = path.match(
-      /^rooms\/([a-zA-Z0-9-]{1,100})\/(presence|messages|clock|signals)$/,
+      /^rooms\/([a-zA-Z0-9-]{1,100})\/(presence|messages|clock|call)$/,
     );
     if (roomMatch) {
       send(

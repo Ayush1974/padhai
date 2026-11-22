@@ -1021,5 +1021,14 @@
   "Room call is ready. Turn on your camera or microphone when you’re ready.": "Room call is ready. Turn on your camera or microphone when you’re ready.",
   "The room call is reconnecting. Keep the room open on both devices.": "The room call is reconnecting. Keep the room open on both devices.",
   "This browser cannot make a room call. Try Chrome, Edge, or Safari.": "This browser cannot make a room call. Try Chrome, Edge, or Safari.",
-  "Your camera or microphone couldn’t connect. Try turning it off and on.": "Your camera or microphone couldn’t connect. Try turning it off and on."
+  "Your camera or microphone couldn’t connect. Try turning it off and on.": "Your camera or microphone couldn’t connect. Try turning it off and on.",
+  "Join video call": "Join video call",
+  "Opening video call…": "Opening video call…",
+  "Close video call": "Close video call",
+  "kMeet study call": "kMeet study call",
+  "Students in this room": "Students in this room",
+  "Chat hidden for you": "Chat hidden for you",
+  "Hide this student's Padhai chat": "Hide this student's Padhai chat",
+  "Turn off low-data mode in Settings to join the video call.": "Turn off low-data mode in Settings to join the video call.",
+  "Choose the browser option in kMeet, then enter your name. Everyone in this study room joins the same call.": "Choose the browser option in kMeet, then enter your name. Everyone in this study room joins the same call."
 }

@@ -6,44 +6,6 @@ const fail = (message, status = 400) =>
 const memberLifetime = 45000;
 const validId = (value) =>
   typeof value === "string" && /^[a-zA-Z0-9-]{1,100}$/.test(value);
-const signalLifetime = 45000;
-const validTopic = (value) =>
-  typeof value === "string" && /^[a-zA-Z0-9+/_=-]{16,100}$/.test(value);
-
-async function readSignals(roomId, memberId, topics, read) {
-  if (topics === undefined) return [];
-  if (
-    !Array.isArray(topics) || topics.length > 2 || !topics.every(validTopic) ||
-    !Array.isArray(read) || read.length > 100 || !read.every(validId)
-  ) {
-    throw fail("Call connection information is incomplete. Open the room again.");
-  }
-  if (!topics.length) return [];
-  const topicParameters = topics.map(() => "?").join(", ");
-  const skipRead = read.length
-    ? ` AND id NOT IN (${read.map(() => "?").join(", ")})`
-    : "";
-  const rows = await database(
-    `SELECT id, topic, message FROM room_signals WHERE room_id = ? AND sender_id <> ? AND sent_at > ? AND topic IN (${topicParameters})${skipRead} ORDER BY sent_at, id LIMIT 32`,
-    [roomId, memberId, Date.now() - signalLifetime, ...topics, ...read],
-  );
-  return rows.map((row) => ({ id: row.id, topic: row.topic, message: JSON.parse(row.message) }));
-}
-
-function callIceServers() {
-  const servers = [{ urls: ["stun:stun.cloudflare.com:3478", "stun:stun.l.google.com:19302"] }];
-  const urls = (process.env.TURN_URLS || "").split(",")
-    .map((url) => url.trim()).filter((url) => /^turns?:[^\s]+$/.test(url));
-  if (urls.length && process.env.TURN_USERNAME && process.env.TURN_CREDENTIAL) {
-    servers.push({
-      urls,
-      username: process.env.TURN_USERNAME,
-      credential: process.env.TURN_CREDENTIAL,
-    });
-  }
-  return servers;
-}
-
 async function snapshot(roomId) {
   const [room] = await database(
     "SELECT clock, revision FROM study_rooms WHERE id = ?",
@@ -147,11 +109,7 @@ export async function roomRequest(
         "This room already has 8 students. Create another room for your group.",
         409,
       );
-    const room = await snapshot(roomId);
-    if (data.signalTopics !== undefined) {
-      room.signals = await readSignals(roomId, memberId, data.signalTopics, data.readSignals);
-    }
-    return room;
+    return snapshot(roomId);
   }
   const [member] = await database(
     "SELECT name FROM room_members WHERE room_id = ? AND member_id = ? AND owner_id = ? AND seen_at > ?",
@@ -162,26 +120,13 @@ export async function roomRequest(
       "Your room connection expired. Wait a moment to reconnect.",
       403,
     );
-  if (action === "signals" && method === "GET") return { iceServers: callIceServers() };
-  if (action === "signals" && method === "POST") {
-    const message = JSON.stringify(data.message);
-    if (!validTopic(data.topic) || !message || message.length > 24000 ||
-      (typeof data.message !== "string" &&
-        (typeof data.message !== "object" || data.message === null || Array.isArray(data.message)))) {
-      throw fail("Invalid call connection message.");
-    }
-    const now = Date.now();
-    const limit = await database(
-      "INSERT INTO request_limits (id, count, expires_at) VALUES (?, 1, ?) ON CONFLICT (id) DO UPDATE SET count = CASE WHEN request_limits.expires_at <= ? THEN 1 ELSE request_limits.count + 1 END, expires_at = CASE WHEN request_limits.expires_at <= ? THEN excluded.expires_at ELSE request_limits.expires_at END WHERE request_limits.expires_at <= ? OR request_limits.count < 45 RETURNING count",
-      [`call:${workspaceId}`, now + 10000, now, now, now],
+  if (action === "call" && method === "POST") {
+    // Keep the first ID even when two students open the call at the same time.
+    const [call] = await database(
+      "INSERT INTO room_calls (room_id, call_id) VALUES (?, ?) ON CONFLICT (room_id) DO UPDATE SET call_id = room_calls.call_id RETURNING call_id",
+      [roomId, randomUUID().replace(/-/g, "")],
     );
-    if (!limit.length) throw fail("Call is reconnecting. Please give it a moment.", 429);
-    await database("DELETE FROM room_signals WHERE sent_at < ?", [now - signalLifetime]);
-    await database(
-      "INSERT INTO room_signals (id, room_id, sender_id, topic, message, sent_at) VALUES (?, ?, ?, ?, ?, ?)",
-      [randomUUID(), roomId, memberId, data.topic, message, now],
-    );
-    return { sent: true };
+    return { url: `https://kmeet.infomaniak.com/${call.call_id}` };
   }
   if (action === "messages" && method === "POST") {
     if (

@@ -580,9 +580,54 @@
   line-height: 1.15;
 }
 
-.room-stage > .media-play {
-  position: static;
-  margin-top: 10px;
+.room-call-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.room-call-help {
+  margin: 12px 0;
+}
+
+.room-call-frame {
+  display: block;
+  width: 100%;
+  height: clamp(420px, 75dvh, 720px);
+  border: 0;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.room-members {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 8px;
+  padding: 0;
+  margin: 14px 0 0;
+  list-style: none;
+}
+
+.room-member {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+
+.room-member small,
+.room-member p {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.room-member p {
+  margin: 0;
 }
 
 @media (max-width: 720px) {

@@ -1,4 +1,5 @@
 import test, { before, after } from "node:test";
+import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import nodemailer from "nodemailer";
 import handler from "../server/handler.mjs";
@@ -343,227 +344,84 @@ test(
 );
 
 test(
-  "three students can share cameras and microphones together in a live study room",
+  "desktop and phone-sized study room participants share an embedded kMeet call",
   { timeout: 110000 },
   async () => {
-    const browser = await chromium.launch({
-      channel: "msedge",
-      headless: true,
-      args: [
-        "--use-fake-device-for-media-stream",
-        "--use-fake-ui-for-media-stream",
-      ],
-    });
+    const browser = await chromium.launch({ channel: "msedge", headless: true });
     const first = await browser.newContext({
-      permissions: [
-        "clipboard-read",
-        "clipboard-write",
-        "camera",
-        "microphone",
-      ],
+      permissions: ["clipboard-read", "clipboard-write"],
     });
     const second = await browser.newContext({
-      permissions: ["camera", "microphone"],
+      viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
     });
-    const third = await browser.newContext({
-      permissions: ["camera", "microphone"],
-    });
-    const statuses = [];
-    const relayOnly = process.env.PADHAI_TEST_RELAY_ONLY === "1";
-    for (const context of [first, second, third]) {
-      await context.routeWebSocket("**/*", (socket) => socket.close());
-      await context.route("**/api/rooms/*/signals", async (route) => {
-        if (route.request().method() === "POST") {
-          const { message } = route.request().postDataJSON();
-          const signal = typeof message === "string" ? JSON.parse(message) : message;
-          // Separate HTTP requests can deliver candidates before their offer on a slow network.
-          if (signal?.offer) await new Promise((resolve) => setTimeout(resolve, 3200));
-        }
-        await route.continue();
-      });
-      await context.addInitScript((relayOnly) => {
-        const devices = navigator.mediaDevices;
-        const capture = devices.getUserMedia.bind(devices);
-        devices.getUserMedia = async (constraints) => {
-          if (!constraints.audio || constraints.video) return capture(constraints);
-          // Each page gets its own microphone tone so the shared test device cannot mute a tab.
-          const audio = new AudioContext();
-          const source = audio.createOscillator();
-          const destination = audio.createMediaStreamDestination();
-          source.frequency.value = 440;
-          source.connect(destination);
-          source.start();
-          await audio.resume();
-          return destination.stream;
-        };
-        const Peer = window.RTCPeerConnection;
-        window.testRoomPeers = [];
-        window.RTCPeerConnection = class extends Peer {
-          constructor(configuration) {
-            super(relayOnly ? { ...configuration, iceTransportPolicy: "relay" } : configuration);
-            window.testRoomPeers.push(this);
-          }
-        };
-      }, relayOnly);
-      context.on("response", (response) => {
-        if (response.url().includes("/signals"))
-          statuses.push(response.request().method() + " " + response.status());
-        if (response.url().includes("/presence") && response.request().method() === "PUT")
-          void response.json().then((data) => {
-            if (data.signals?.length) statuses.push("received " + data.signals.length);
-          }).catch(() => {});
-      });
-    }
     try {
+      const vercel = JSON.parse(await readFile(new URL("../vercel.json", import.meta.url), "utf8"));
+      const policy = vercel.headers.find((route) => route.source === "/(.*)")
+        .headers.find(({ key }) => key === "Permissions-Policy").value;
+      for (const context of [first, second]) {
+        await context.route(base + "/", async (route) => {
+          const response = await route.fetch();
+          await route.fulfill({
+            response,
+            headers: { ...response.headers(), "permissions-policy": policy },
+          });
+        });
+        await context.route("https://kmeet.infomaniak.com/**", (route) => route.fulfill({
+          contentType: "text/html",
+          body: "<h1>Test meeting</h1>",
+        }));
+      }
+
       const a = await first.newPage();
       const b = await second.newPage();
-      const c = await third.newPage();
       await openWorkspace(a, "First Student");
-      await a
-        .getByRole("button", { name: "Create a room", exact: true })
-        .first()
-        .click();
-      await a
-        .getByLabel("Room name", { exact: true })
-        .fill("GATE accountability");
-      await a
-        .getByRole("button", { name: "Create & enter room", exact: true })
-        .click();
-      await a
-        .getByRole("button", { name: "Invite a friend", exact: true })
-        .click();
-      const link = await a
-        .getByLabel("Room invite link", { exact: true })
-        .inputValue();
-      await a
-        .getByRole("button", { name: "Copy invite link", exact: true })
-        .click();
-      assert.equal(
-        await a.evaluate(() => navigator.clipboard.readText()),
-        link,
-      );
-      await a
-        .getByRole("button", { name: "Close dialog", exact: true })
-        .click();
+      await a.getByRole("button", { name: "Create a room", exact: true }).first().click();
+      await a.getByLabel("Room name", { exact: true }).fill("GATE accountability");
+      await a.getByRole("button", { name: "Create & enter room", exact: true }).click();
+      await a.getByRole("button", { name: "Invite a friend", exact: true }).click();
+      const link = await a.getByLabel("Room invite link", { exact: true }).inputValue();
+      await a.getByRole("button", { name: "Copy invite link", exact: true }).click();
+      assert.equal(await a.evaluate(() => navigator.clipboard.readText()), link);
+      await a.getByRole("button", { name: "Close dialog", exact: true }).click();
       await openWorkspace(b, "Second Student", link);
-      await a
-        .locator(".participant-label")
-        .filter({ hasText: "Second Student" })
-        .waitFor({ timeout: 60000 });
-      await b
-        .locator(".participant-label")
-        .filter({ hasText: "First Student" })
-        .waitFor({ timeout: 10000 });
-      const firstTile = b.locator(".participant").filter({
-        has: b.getByText("First Student", { exact: true }),
-      });
-      await b.getByRole("region", { name: "Live study group" }).waitFor();
-      await firstTile.getByText("No video yet", { exact: true }).waitFor();
-      await b.locator(".participant.is-you").getByText("Camera off", { exact: true }).waitFor();
-      await a
-        .getByLabel("Message your study room", { exact: true })
-        .fill("Ready to study GATE CS");
-      await a
-        .getByRole("button", { name: "Send message", exact: true })
-        .click();
-      await b
-        .locator(".chat-message")
-        .filter({ hasText: "Ready to study GATE CS" })
-        .waitFor({ timeout: 15000 });
-      await a
-        .getByRole("button", { name: "Start together", exact: true })
-        .click();
-      await b
-        .getByRole("button", { name: "Pause together", exact: true })
-        .waitFor();
-      await b.evaluate(() => {
-        window.scrollEvents = [];
-        document.addEventListener("scroll", () =>
-          window.scrollEvents.push({ y: scrollY, time: performance.now() }),
-        );
-        scrollTo({ top: 100, behavior: "instant" });
-      });
-      const before = await b.evaluate(() => scrollY);
-      await b.waitForTimeout(2200);
-      const after = await b.evaluate(() => ({
-        y: scrollY,
-        events: window.scrollEvents,
+      await a.locator(".room-member").filter({ hasText: "Second Student" }).waitFor();
+      await b.locator(".room-member").filter({ hasText: "First Student" }).waitFor();
+
+      await a.getByLabel("Message your study room", { exact: true }).fill("Ready to study GATE CS");
+      await a.getByRole("button", { name: "Send message", exact: true }).click();
+      await b.locator(".chat-message").filter({ hasText: "Ready to study GATE CS" }).waitFor();
+      await a.getByRole("button", { name: "Start together", exact: true }).click();
+      await b.getByRole("button", { name: "Pause together", exact: true }).waitFor();
+
+      const urls = await Promise.all([a, b].map(async (page) => {
+        await page.getByRole("button", { name: "Join video call", exact: true }).click();
+        const frame = page.frameLocator('iframe[title="kMeet study call"]');
+        await frame.getByRole("heading", { name: "Test meeting" }).waitFor();
+        assert.deepEqual(await frame.locator("body").evaluate(() => ({
+          camera: document.featurePolicy.allowsFeature("camera"),
+          microphone: document.featurePolicy.allowsFeature("microphone"),
+          screen: document.featurePolicy.allowsFeature("display-capture"),
+        })), { camera: true, microphone: true, screen: true });
+        assert.equal(page.url(), link);
+        assert.equal(page.context().pages().length, 1);
+        return page.getByTitle("kMeet study call").getAttribute("src");
       }));
-      assert.ok(
-        Math.abs(after.y - before) <= 1,
-        JSON.stringify({ before, after }),
-      );
-      for (const page of [a, b]) {
-        await page.getByRole("button", { name: "Turn camera on", exact: true }).click();
-        await page.getByRole("button", { name: "Turn microphone on", exact: true }).click();
-      }
-      await openWorkspace(c, "Third Student", link);
-      await c.getByRole("button", { name: "Turn camera on", exact: true }).click();
-      await c.getByRole("button", { name: "Turn microphone on", exact: true }).click();
-      try {
-        await Promise.all([a, b, c].map(async (page) => {
-          await page.waitForFunction(async (relayOnly) => {
-            const cameras = [...document.querySelectorAll(".participant:not(.is-you) video")];
-            const microphones = [...document.querySelectorAll(".audio-only")];
-            const playing = cameras.length === 2 && microphones.length === 2 &&
-              cameras.every((video) => video.videoWidth > 0 && video.readyState >= 2) &&
-              microphones.every((audio) => !audio.paused && !audio.muted &&
-                audio.srcObject?.getAudioTracks().some((track) => !track.muted && track.readyState === "live"));
-            if (!playing) return false;
-            const peers = window.testRoomPeers.filter((peer) => peer.connectionState === "connected");
-            const reports = await Promise.all(peers.map((peer) => peer.getStats()));
-            return reports.filter((stats) => {
-              const entries = [...stats.values()];
-              if (relayOnly) {
-                const pair = stats.get(entries.find((report) => report.selectedCandidatePairId)?.selectedCandidatePairId);
-                if (stats.get(pair?.localCandidateId)?.candidateType !== "relay") return false;
-              }
-              return entries.some((report) =>
-                report.type === "inbound-rtp" && report.kind === "audio" && report.packetsReceived > 0,
-              );
-            }).length === 2;
-          }, relayOnly, { timeout: 25000 });
-        }));
-      } catch (error) {
-        const diagnostics = await Promise.all([a, b, c].map((page) => page.evaluate(async () => {
-          const peers = await Promise.all(window.testRoomPeers.map(async (peer) => ({
-            connection: peer.connectionState, ice: peer.iceConnectionState,
-            tracks: peer.getTransceivers().map(({ currentDirection, sender, receiver }) => ({
-              direction: currentDirection, kind: receiver.track.kind,
-              local: sender.track?.readyState, remoteMuted: receiver.track.muted,
-            })),
-            audioPackets: [...(await peer.getStats()).values()]
-              .filter((report) => report.kind === "audio" && /^(in|out)bound-rtp$/.test(report.type))
-              .map(({ type, packetsSent, packetsReceived }) => ({ type, packetsSent, packetsReceived })),
-          })));
-          return { status: document.querySelector(".room-connection-note")?.textContent, peers };
-        })));
-        throw new Error(JSON.stringify({ statuses, diagnostics }), { cause: error });
-      }
-      await a.getByRole("button", { name: "Mute room audio", exact: true }).click();
-      await a.waitForFunction(() => {
-        const microphones = [...document.querySelectorAll(".audio-only")];
-        return microphones.length === 2 && microphones.every((audio) => audio.muted);
-      });
-      await a.getByRole("button", { name: "Unmute room audio", exact: true }).click();
-      await a.waitForFunction(() => {
-        const microphones = [...document.querySelectorAll(".audio-only")];
-        return microphones.length === 2 && microphones.every((audio) => !audio.paused && !audio.muted);
-      });
-      await a.getByRole("button", { name: "Turn camera off", exact: true }).click();
-      await firstTile.locator("video").waitFor({ state: "detached", timeout: 10000 });
-      await firstTile.getByText("No video yet", { exact: true }).waitFor();
-      await b.locator(".participant").filter({
-        has: b.getByText("Third Student", { exact: true }),
-      }).locator("video").waitFor({ state: "visible", timeout: 10000 });
-      await a.getByRole("button", { name: "Turn camera on", exact: true }).click();
-      await b.waitForFunction(() => {
-        const cameras = [...document.querySelectorAll(".participant:not(.is-you) video")];
-        return cameras.length === 2 && cameras.every((camera) => camera.videoWidth > 0);
-      });
+      assert.match(urls[0], /^https:\/\/kmeet\.infomaniak\.com\/[a-f0-9]{32}$/);
+      assert.equal(urls[1], urls[0]);
+
+      await b.getByRole("button", { name: "Close video call", exact: true }).click();
+      await b.getByTitle("kMeet study call").waitFor({ state: "detached" });
+      await b.reload();
+      await b.getByRole("button", { name: "Join video call", exact: true }).click();
+      const embeddedCall = b.getByTitle("kMeet study call");
+      await embeddedCall.waitFor();
+      assert.equal(await embeddedCall.getAttribute("src"), urls[0]);
 
       for (const width of [320, 360, 390]) {
         await b.setViewportSize({ width, height: 680 });
+        const frameBounds = await embeddedCall.boundingBox();
+        assert.ok(frameBounds.x >= 0 && frameBounds.x + frameBounds.width <= width,
+          `The embedded call overflows at ${width}px`);
         const widgets = b.locator(".room-layout .study-widgets");
         const cards = await widgets.evaluate((aside) => {
           const timer = aside.querySelector(".timer-panel").getBoundingClientRect();
@@ -589,11 +447,9 @@ test(
         assert.ok(labelFits, `Sound labels are clipped in Focus at ${width}px`);
         await dialog.getByRole("button", { name: "Back to your study space" }).click();
       }
-      assert.ok(!statuses.includes("POST 429"), "Delayed offers should not exhaust the room's signaling limit");
     } finally {
       await first.close();
       await second.close();
-      await third.close();
       await browser.close();
     }
   },

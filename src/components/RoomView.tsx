@@ -8,9 +8,6 @@ import {
   Flag,
   LockKeyhole,
   MessageCircle,
-  Mic,
-  MicOff,
-  MonitorUp,
   Pause,
   Play,
   RotateCcw,
@@ -19,69 +16,16 @@ import {
   Target,
   Users,
   Video,
-  VideoOff,
-  Volume2,
-  VolumeX,
 } from "lucide-react";
 import type { FocusTimer } from "../hooks/useTimer";
 import type { Ambient } from "../hooks/useAmbient";
-import { useStudyRoom } from "../hooks/useRooms";
+import { useRoomState } from "../hooks/useRoomState";
+import { api } from "../lib/cloud";
 import { clock, createTimer } from "../lib/study";
 import type { Profile, StudyRoom } from "../types";
 import { Timer } from "./Timer";
 import { SoundMixer } from "./SoundMixer";
 import { Modal } from "./Modal";
-function Media({
-  stream,
-  muted,
-  audioOnly = false,
-}: {
-  stream: MediaStream;
-  muted: boolean;
-  audioOnly?: boolean;
-}) {
-  const element = useRef<HTMLVideoElement>(null);
-  const [needsPlay, setNeedsPlay] = useState(false);
-  useEffect(() => {
-    const media = element.current!;
-    media.srcObject = stream;
-    return () => {
-      media.srcObject = null;
-    };
-  }, [stream]);
-  useEffect(() => {
-    let active = true;
-    void element.current?.play().then(
-      () => { if (active) setNeedsPlay(false); },
-      () => { if (active) setNeedsPlay(true); },
-    );
-    return () => { active = false; };
-  }, [stream, muted]);
-  return (
-    <>
-      <video
-        ref={element}
-        autoPlay
-        muted={muted}
-        playsInline
-        className={audioOnly ? "audio-only" : ""}
-      />
-      {t(
-        needsPlay && !muted && (
-          <button
-            className="media-play"
-            onClick={() => {
-              void element.current?.play().then(() => setNeedsPlay(false)).catch(() => {});
-            }}
-          >
-            <Volume2 size={15} />
-            {t(" Enable room sound")}
-          </button>
-        ),
-      )}
-    </>
-  );
-}
 export function RoomView({
   room,
   profile,
@@ -99,11 +43,13 @@ export function RoomView({
   onExpand: () => void;
   notify: (message: string) => void;
 }) {
-  const live = useStudyRoom(room, profile, notify);
+  const live = useRoomState(room, profile, notify);
   const [message, setMessage] = useState("");
   const [goal, setGoal] = useState("");
   const [now, setNow] = useState(Date.now());
-  const [muted, setMuted] = useState(false);
+  const [callUrl, setCallUrl] = useState("");
+  const [callLoading, setCallLoading] = useState(false);
+  const [hiddenMembers, setHiddenMembers] = useState<string[]>([]);
   const [joiningTimer, setJoiningTimer] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
@@ -114,6 +60,25 @@ export function RoomView({
     ? Math.max(0, Math.ceil((shared.endAt - now) / 1000))
     : shared.remaining;
   const allMembers = Object.entries(live.members);
+  const messages = live.messages.filter((item) => !hiddenMembers.includes(item.peerId));
+  useEffect(() => {
+    if (profile.lowData && callUrl) setCallUrl("");
+  }, [profile.lowData, callUrl]);
+  async function openCall() {
+    setCallLoading(true);
+    try {
+      const call = await api<{ url: string }>(`rooms/${room.id}/call`, {
+        method: "POST",
+        body: JSON.stringify({ memberId: live.selfId }),
+        signal: AbortSignal.timeout(15000),
+      });
+      setCallUrl(call.url);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "The video call could not open. Please try again.");
+    } finally {
+      setCallLoading(false);
+    }
+  }
   useEffect(() => {
     if (!shared.endAt) return;
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -122,7 +87,7 @@ export function RoomView({
   useEffect(() => {
     const pane = chatPane.current;
     if (pane) pane.scrollTop = pane.scrollHeight;
-  }, [live.messages.length]);
+  }, [messages.length]);
   useEffect(() => {
     if (!joiningTimer) return;
     const remaining = shared.endAt
@@ -249,234 +214,74 @@ export function RoomView({
             </label>
           </section>
 
-          <p className="room-connection-note" role="status">{t(live.mediaStatus)}</p>
           <section className="room-stage" aria-label={t("Live study group")}>
             <div className="stage-heading">
               <span>
                 <Users size={16} />
                 {t(" Live study group")}
               </span>
-              <span className="tiny">
-                {t(
-                  profile.lowData
-                    ? "LOW DATA MODE"
-                    : "Everyone can turn on their camera and speak at the same time.",
-                )}
-              </span>
             </div>
-            <div className="participant-grid">
-              {t(
-                allMembers.map(([userId, member]) => {
-                  const self = userId === live.selfId;
-                  const cameraStatus = self ? "Camera off" : "No video yet";
-                  const camera = self
-                    ? live.localStreams.camera
-                    : live.streams.find(
-                        (stream) =>
-                          stream.userId === userId && stream.kind === "camera",
-                      )?.stream;
-                  return (
-                    <article
-                      className={`participant ${self ? "is-you" : ""} ${live.blocked.includes(userId) ? "is-blocked" : ""}`}
-                      key={userId}
-                    >
-                      {t(
-                        camera && !profile.lowData ? (
-                          <Media stream={camera} muted />
-                        ) : (
-                          <div className="participant-placeholder">
-                            <div
-                              className={`participant-avatar avatar-${member.exam.toLowerCase()}`}
-                            >
-                              {t(member.name.slice(0, 1).toUpperCase())}
-                            </div>
-                            <span>
-                              {t(
-                                live.blocked.includes(userId)
-                                  ? "Hidden for you"
-                                  : member.goal || cameraStatus,
-                              )}
-                            </span>
-                          </div>
-                        ),
-                      )}
-                      <div className="participant-label">
-                        <span>
-                          <span className="green-dot" />
-                          {t(member.name)}
-                          {t(self && <small>{t("You")}</small>)}
-                        </span>
-                        {t(
-                          !self && (
-                            <button
-                              className="icon-button"
-                              title={t(
-                                "Hide and mute this student for this visit",
-                              )}
-                              aria-label={`Hide ${member.name}`}
-                              onClick={() => live.block(userId)}
-                            >
-                              <Flag size={13} />
-                            </button>
-                          ),
-                        )}
-                        {t(
-                          self &&
-                            (live.localStreams.microphone ? (
-                              <Mic size={13} />
-                            ) : (
-                              <MicOff size={13} />
-                            )),
-                        )}
-                      </div>
-                      <span className="participant-exam">{t(member.exam)}</span>
-                    </article>
-                  );
-                }),
+            <div className="room-call-actions">
+              {callUrl && !profile.lowData ? (
+                <button className="secondary" onClick={() => setCallUrl("")}>
+                  {t("Close video call")}
+                </button>
+              ) : (
+                <button
+                  className="primary"
+                  disabled={!live.ready || callLoading || profile.lowData}
+                  onClick={() => void openCall()}
+                >
+                  <Video size={17} />
+                  {t(callLoading ? "Opening video call…" : "Join video call")}
+                </button>
               )}
-              {t(
-                allMembers.length < 8 && (
-                  <button className="empty-seat" onClick={() => void invite()}>
-                    <div>
-                      <Users size={23} />
-                    </div>
-                    <strong>{t("A little room for a friend")}</strong>
-                    <span>
-                      {t("Share your invite link ")}
-                      <ArrowUpRight size={13} />
-                    </span>
-                  </button>
-                ),
-              )}
-            </div>
-            {t(
-              live.streams
-                .filter(
-                  (stream) =>
-                    stream.kind === "microphone" &&
-                    !live.blocked.includes(stream.userId),
-                )
-                .map((stream) => (
-                  <Media
-                    key={`${stream.peerId}-audio`}
-                    stream={stream.stream}
-                    muted={muted}
-                    audioOnly
-                  />
-                )),
-            )}
-            {t(
-              live.localStreams.screen && (
-                <div className="screen-share">
-                  <span>{t("You\u2019re sharing your screen")}</span>
-                  <Media stream={live.localStreams.screen} muted />
-                </div>
-              ),
-            )}
-            {t(
-              live.streams
-                .filter(
-                  (stream) =>
-                    stream.kind === "screen" &&
-                    !live.blocked.includes(stream.userId),
-                )
-                .map((stream) => (
-                  <div className="screen-share" key={`${stream.peerId}-screen`}>
-                    <span>
-                      {t(live.members[stream.userId]?.name || "Student")}
-                      {t("\u2019s screen")}
-                    </span>
-                    <Media stream={stream.stream} muted />
-                  </div>
-                )),
-            )}
-            <div className="room-media-controls">
-              <button
-                className={`media-control ${live.localStreams.camera ? "enabled" : ""}`}
-                disabled={
-                  live.busyMedia ||
-                  (!live.localStreams.camera &&
-                    (profile.lowData || !live.ready || !live.mediaReady))
-                }
-                onClick={() => void live.toggleMedia("camera")}
-                aria-label={
-                  live.localStreams.camera
-                    ? "Turn camera off"
-                    : "Turn camera on"
-                }
-              >
-                {t(
-                  live.localStreams.camera ? (
-                    <Video size={19} />
-                  ) : (
-                    <VideoOff size={19} />
-                  ),
-                )}
-                <span>{t("Camera")}</span>
-              </button>
-              <button
-                className={`media-control ${live.localStreams.microphone ? "enabled" : ""}`}
-                disabled={
-                  live.busyMedia ||
-                  (!live.localStreams.microphone &&
-                    (profile.lowData || !live.ready || !live.mediaReady))
-                }
-                onClick={() => void live.toggleMedia("microphone")}
-                aria-label={
-                  live.localStreams.microphone
-                    ? "Turn microphone off"
-                    : "Turn microphone on"
-                }
-              >
-                {t(
-                  live.localStreams.microphone ? (
-                    <Mic size={19} />
-                  ) : (
-                    <MicOff size={19} />
-                  ),
-                )}
-                <span>{t("Microphone")}</span>
-              </button>
-              <button
-                className={`media-control ${live.localStreams.screen ? "enabled" : ""}`}
-                disabled={
-                  live.busyMedia ||
-                  (!live.localStreams.screen &&
-                    (profile.lowData || !live.ready || !live.mediaReady))
-                }
-                onClick={() => void live.toggleMedia("screen")}
-                aria-label={
-                  live.localStreams.screen
-                    ? "Stop sharing screen"
-                    : "Share your screen"
-                }
-              >
-                <MonitorUp size={19} />
-                <span>{t("Share screen")}</span>
-              </button>
-              <button
-                className={`media-control ${muted ? "" : "enabled"}`}
-                onClick={(event) => {
-                  setMuted(!muted);
-                  if (muted) {
-                    const players = event.currentTarget.closest(".room-stage")
-                      ?.querySelectorAll<HTMLVideoElement>(".audio-only");
-                    for (const player of players || []) {
-                      player.muted = false;
-                      void player.play().catch(() => {});
-                    }
-                  }
-                }}
-                aria-label={t(muted ? "Unmute room audio" : "Mute room audio")}
-                aria-pressed={!muted}
-              >
-                {t(muted ? <VolumeX size={19} /> : <Volume2 size={19} />)}
-                <span>{t(muted ? "Turn sound on" : "Room sound on")}</span>
-              </button>
               <button className="leave-room" onClick={onLeave}>
                 {t("Leave room")}
               </button>
             </div>
+            <p className="tiny muted room-call-help">
+              {t(profile.lowData
+                ? "Turn off low-data mode in Settings to join the video call."
+                : "Choose the browser option in kMeet, then enter your name. Everyone in this study room joins the same call.")}
+            </p>
+            {callUrl && !profile.lowData && (
+              <iframe
+                className="room-call-frame"
+                title={t("kMeet study call")}
+                src={callUrl}
+                allow="autoplay; camera; microphone; display-capture; fullscreen; screen-wake-lock"
+                allowFullScreen
+                referrerPolicy="no-referrer"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-presentation"
+              />
+            )}
+            <ul className="room-members" aria-label={t("Students in this room")}>
+              {allMembers.map(([memberId, member]) => {
+                const self = memberId === live.selfId;
+                const hidden = hiddenMembers.includes(memberId);
+                return (
+                  <li className="room-member" key={memberId}>
+                    <div>
+                      <strong>{member.name}</strong>
+                      {self && <small> · {t("You")}</small>}
+                      <small> · {member.exam}</small>
+                      {hidden ? <p>{t("Chat hidden for you")}</p> : member.goal && <p>{member.goal}</p>}
+                    </div>
+                    {!self && !hidden && (
+                      <button
+                        className="icon-button"
+                        title={t("Hide this student's Padhai chat")}
+                        aria-label={t("Hide this student's Padhai chat") + " · " + member.name}
+                        onClick={() => setHiddenMembers((current) => [...current, memberId])}
+                      >
+                        <Flag size={13} />
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
           </section>
 
           <form
@@ -520,7 +325,7 @@ export function RoomView({
               aria-label={t("Room chat")}
             >
               {t(
-                !live.messages.length && (
+                !messages.length && (
                   <div className="chat-welcome">
                     <span>{t("\uD83D\uDC4B")}</span>
                     <h3>{t("You\u2019re in good company.")}</h3>
@@ -537,7 +342,7 @@ export function RoomView({
                 ),
               )}
               {t(
-                live.messages.map((item) => (
+                messages.map((item) => (
                   <div
                     key={item.id}
                     className={`chat-message ${item.peerId === live.selfId ? "own-message" : ""}`}

@@ -1,4 +1,4 @@
-const CACHE = 'padhai-v11';
+const CACHE = 'padhai-v12';
 const SHELL = ['/', '/padhai-logo.webp', '/icon-192.png?v=5', '/icon-512.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', event => {
