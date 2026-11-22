@@ -4,16 +4,69 @@ A free, open-source study companion for Indian students. Built with ❤️ by Ay
 
 ## Use the app
 
-[Open the live app](https://padhai-gamma.vercel.app)
+[Open the live app](https://padhai-gamma.vercel.app) · [Screenshot tour](#screenshot-tour) · [Run locally](#run-locally)
 
 1. Register with your name, course or exam, email, and password. Verify the six-digit email code. Verified email registration or sign-in is required to access the app.
 2. Confirm your display name when you first open your account on a browser. Sign-in and that confirmation carry over to later visits in the same browser.
-3. Open **My exam plan**. Start with GATE CS, select another template, upload your syllabus PDF for AI extraction, fetch an official syllabus, or write your own outline. Review an import before adding it or replacing your current topics.
-4. Set daily, weekly, monthly, and yearly study-time targets. Start a subject timer or log time studied away from the app.
-5. Keep tasks in **My planner** and sessions in **Study calendar**. Add an event to Google Calendar, or import the `.ics` export into a calendar app for reminders. Calendar exports are copies; later edits do not synchronize automatically.
-6. Create notebooks in **My notes**, attach files, and use **Save note** for an immediate cloud sync. **Download PDF** exports the title and text. **Share note** creates a link that a signed-in Padhai user can open to import a copy into Inbox. Shared copies contain the title and text.
-7. Read the daily shloka and chaupai in **A little wisdom**. Pick your language for an explanation, and follow the link to the original.
-8. Use **Ask AI** for explanations and suggestions. Tasks and sessions are added only when you review and accept them.
+3. Open **Study rooms** and pick a room or create one for friends. Choose **Join video call** and select the browser option in kMeet to stay inside Padhai.
+4. Open **My exam plan**. Start with GATE CS, select another template, upload your syllabus PDF for AI extraction, fetch an official syllabus, or write your own outline. Review an import before adding it or replacing your current topics.
+5. Set daily, weekly, monthly, and yearly study-time targets. Start a subject timer or log time studied away from the app.
+6. Keep tasks in **My planner** and sessions in **Study calendar**. Add an event to Google Calendar, or import the `.ics` export into a calendar app for reminders. Calendar exports are copies; later edits do not synchronize automatically.
+7. Create notebooks in **My notes**, attach files, and use **Save note** for an immediate cloud sync. **Download PDF** exports the title and text. **Share note** creates a link that a signed-in Padhai user can open to import a copy into Inbox. Shared copies contain the title and text.
+8. Read the daily shloka and chaupai in **A little wisdom**. Pick your language for an explanation, and follow the link to the original.
+9. Use **Ask AI** for explanations and suggestions. Tasks and sessions are added only when you review and accept them.
+
+## Screenshot tour
+
+These Microsoft Edge screenshots show a sample GATE CS workspace in light and dark mode.
+
+### 1. Find a room or study on your own
+
+Open **Study rooms** to find a room or create one. For solo study, pick a subject in **Your focus space** and select **Start session**.
+
+![Padhai home with the study-room finder, a saved invite room, and a personal focus timer](docs/screenshots/01-study-rooms.png)
+
+### 2. Study together in a live room
+
+Select **Invite a friend** to share the room. Choose **Join video call** to open kMeet inside Padhai, or **Start together** to use the shared focus clock. Everyone can set a study intention and use the room chat.
+
+![Dark-mode study room with three example students, the video-call button, a shared clock, and chat](docs/screenshots/02-live-study-room.png)
+
+### 3. Make the exam plan your own
+
+Start with a subject preset or choose **Import syllabus**. Edit the topics, check them off as you learn, and set study-time targets for the day, week, month, and year.
+
+![GATE CS exam plan with four study targets and an expanded Algorithms topic checklist](docs/screenshots/03-exam-plan.png)
+
+### 4. Schedule a study session
+
+Open **Study calendar**, select a date, and choose **Plan a session**. Add it to Google Calendar for reminders or export an `.ics` file to use in another calendar app.
+
+![November study calendar with logged study time and two planned sessions on the selected day](docs/screenshots/04-study-calendar.png)
+
+### 5. See your progress
+
+After a focus session or a manual study log, open **My progress** to compare study time across the week, check your daily target, and see your study streak.
+
+![Progress dashboard with total focus time, sessions, a study streak, and a weekly chart](docs/screenshots/05-study-progress.png)
+
+### 6. Keep revision notes and files together
+
+Open **My notes** and create a notebook for an exam or subject. Use **Save note** to sync your edits and **Download PDF** to keep a copy. **Share note** creates a link a signed-in friend can use to import it.
+
+![A GATE CS notebook showing a graph traversal note, a PDF attachment, and save, PDF export, and share controls](docs/screenshots/06-notebook.png)
+
+### 7. Set goals and reflect on your day
+
+Open **Daily foundations** and scroll to **My daily journal**. Write down today's intention, check off goals, and record what to try differently tomorrow.
+
+![The daily journal with a study intention, one checked-off goal, a focus total, and reflection prompts](docs/screenshots/07-daily-journal.png)
+
+### 8. Read the daily wisdom in your language
+
+Open **A little wisdom**, choose **Daily shloka** or **Daily chaupai**, and pick the language for the explanation. Follow the Heritage IIT Kanpur link to read the original. The example below uses Hindi.
+
+![Dark-mode Wisdom page with Bhagavad Gita 2.47 in Sanskrit, an original-source link, and a sample Hindi explanation](docs/screenshots/08-daily-wisdom.png)
 
 ## Privacy and recovery
 
