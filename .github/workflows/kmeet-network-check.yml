@@ -1,0 +1,28 @@
+name: Temporary kMeet network check
+on:
+  push:
+    branches:
+      - codex/kmeet-network-check-mws2pg90
+permissions:
+  contents: read
+jobs:
+  android-profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci --ignore-scripts
+      - name: Run Android-profile caller
+        shell: bash
+        env:
+          KMEET_MOBILE: "1"
+        run: |
+          if command -v google-chrome >/dev/null; then
+            KMEET_BROWSER=chrome node kmeet-network-smoke.mjs
+          else
+            npx playwright install chromium --with-deps
+            node kmeet-network-smoke.mjs
+          fi
