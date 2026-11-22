@@ -580,6 +580,10 @@
   line-height: 1.15;
 }
 
+.room-stage {
+  margin-block-end: 20px;
+}
+
 .room-call-actions {
   display: flex;
   flex-wrap: wrap;
@@ -628,6 +632,12 @@
 
 .room-member p {
   margin: 0;
+}
+
+@media (max-width: 480px) {
+  .room-stage {
+    padding-inline: 9px;
+  }
 }
 
 @media (max-width: 720px) {

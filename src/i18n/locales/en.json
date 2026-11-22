@@ -1030,5 +1030,11 @@
   "Chat hidden for you": "Chat hidden for you",
   "Hide this student's Padhai chat": "Hide this student's Padhai chat",
   "Turn off low-data mode in Settings to join the video call.": "Turn off low-data mode in Settings to join the video call.",
-  "Choose the browser option in kMeet, then enter your name. Everyone in this study room joins the same call.": "Choose the browser option in kMeet, then enter your name. Everyone in this study room joins the same call."
+  "Choose the browser option in kMeet.": "Choose the browser option in kMeet.",
+  "Your Padhai name will be filled in.": "Your Padhai name will be filled in.",
+  "Copy my name": "Copy my name",
+  "Copy your Padhai name and paste it into kMeet.": "Copy your Padhai name and paste it into kMeet.",
+  "Name copied. Paste it into kMeet.": "Name copied. Paste it into kMeet.",
+  "Copying was blocked. Type your name in kMeet.": "Copying was blocked. Type your name in kMeet.",
+  "For quiet audio, check your speakers under Settings → Audio in kMeet.": "For quiet audio, check your speakers under Settings → Audio in kMeet."
 }

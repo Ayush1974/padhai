@@ -61,6 +61,10 @@ export function RoomView({
     : shared.remaining;
   const allMembers = Object.entries(live.members);
   const messages = live.messages.filter((item) => !hiddenMembers.includes(item.peerId));
+  const displayName = profile.name.trim();
+  // kMeet displays these characters as HTML entities when a name is prefilled.
+  const nameNeedsCopy = /[&<>"']/.test(displayName);
+  const callOpen = Boolean(callUrl) && !profile.lowData;
   useEffect(() => {
     if (profile.lowData && callUrl) setCallUrl("");
   }, [profile.lowData, callUrl]);
@@ -72,11 +76,22 @@ export function RoomView({
         body: JSON.stringify({ memberId: live.selfId }),
         signal: AbortSignal.timeout(15000),
       });
-      setCallUrl(call.url);
+      audio.stop();
+      setCallUrl(nameNeedsCopy || !displayName
+        ? call.url
+        : `${call.url}#userInfo.displayName=${encodeURIComponent(JSON.stringify(displayName))}`);
     } catch (error) {
       notify(error instanceof Error ? error.message : "The video call could not open. Please try again.");
     } finally {
       setCallLoading(false);
+    }
+  }
+  async function copyCallName() {
+    try {
+      await navigator.clipboard.writeText(displayName);
+      notify("Name copied. Paste it into kMeet.");
+    } catch {
+      notify("Copying was blocked. Type your name in kMeet.");
     }
   }
   useEffect(() => {
@@ -148,6 +163,85 @@ export function RoomView({
           {t(" Camera & mic are your choice")}
         </span>
       </div>
+      <section className="room-stage" aria-label={t("Live study group")}>
+        <div className="stage-heading">
+          <span>
+            <Users size={16} />
+            {t(" Live study group")}
+          </span>
+        </div>
+        <div className="room-call-actions">
+          {callOpen ? (
+            <button className="secondary" onClick={() => setCallUrl("")}>
+              {t("Close video call")}
+            </button>
+          ) : (
+            <button
+              className="primary"
+              disabled={!live.ready || callLoading || profile.lowData}
+              onClick={() => void openCall()}
+            >
+              <Video size={17} />
+              {t(callLoading ? "Opening video call…" : "Join video call")}
+            </button>
+          )}
+          {callOpen && nameNeedsCopy && (
+            <button className="secondary" onClick={() => void copyCallName()}>
+              <Copy size={16} />
+              {t("Copy my name")}
+            </button>
+          )}
+          <button className="leave-room" onClick={onLeave}>
+            {t("Leave room")}
+          </button>
+        </div>
+        <p className="tiny muted room-call-help">
+          {profile.lowData
+            ? t("Turn off low-data mode in Settings to join the video call.")
+            : t("Choose the browser option in kMeet.")}{" "}
+          {callOpen && t(nameNeedsCopy
+            ? "Copy your Padhai name and paste it into kMeet."
+            : "Your Padhai name will be filled in.")}{" "}
+          {callOpen && t("For quiet audio, check your speakers under Settings → Audio in kMeet.")}
+        </p>
+        {callOpen && (
+          <iframe
+            className="room-call-frame"
+            title={t("kMeet study call")}
+            src={callUrl}
+            allow="autoplay; camera; microphone; display-capture; fullscreen; screen-wake-lock; speaker-selection"
+            allowFullScreen
+            referrerPolicy="no-referrer"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-presentation"
+          />
+        )}
+        <ul className="room-members" aria-label={t("Students in this room")}>
+          {allMembers.map(([memberId, member]) => {
+            const self = memberId === live.selfId;
+            const hidden = hiddenMembers.includes(memberId);
+            return (
+              <li className="room-member" key={memberId}>
+                <div>
+                  <strong>{member.name}</strong>
+                  {self && <small> · {t("You")}</small>}
+                  <small> · {member.exam}</small>
+                  {hidden ? <p>{t("Chat hidden for you")}</p> : member.goal && <p>{member.goal}</p>}
+                </div>
+                {!self && !hidden && (
+                  <button
+                    className="icon-button"
+                    title={t("Hide this student's Padhai chat")}
+                    aria-label={t("Hide this student's Padhai chat") + " · " + member.name}
+                    onClick={() => setHiddenMembers((current) => [...current, memberId])}
+                  >
+                    <Flag size={13} />
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
       <div className="study-layout room-layout">
         <div className="study-main">
           <section className="shared-clock">
@@ -212,76 +306,6 @@ export function RoomView({
                 ),
               )}
             </label>
-          </section>
-
-          <section className="room-stage" aria-label={t("Live study group")}>
-            <div className="stage-heading">
-              <span>
-                <Users size={16} />
-                {t(" Live study group")}
-              </span>
-            </div>
-            <div className="room-call-actions">
-              {callUrl && !profile.lowData ? (
-                <button className="secondary" onClick={() => setCallUrl("")}>
-                  {t("Close video call")}
-                </button>
-              ) : (
-                <button
-                  className="primary"
-                  disabled={!live.ready || callLoading || profile.lowData}
-                  onClick={() => void openCall()}
-                >
-                  <Video size={17} />
-                  {t(callLoading ? "Opening video call…" : "Join video call")}
-                </button>
-              )}
-              <button className="leave-room" onClick={onLeave}>
-                {t("Leave room")}
-              </button>
-            </div>
-            <p className="tiny muted room-call-help">
-              {t(profile.lowData
-                ? "Turn off low-data mode in Settings to join the video call."
-                : "Choose the browser option in kMeet, then enter your name. Everyone in this study room joins the same call.")}
-            </p>
-            {callUrl && !profile.lowData && (
-              <iframe
-                className="room-call-frame"
-                title={t("kMeet study call")}
-                src={callUrl}
-                allow="autoplay; camera; microphone; display-capture; fullscreen; screen-wake-lock"
-                allowFullScreen
-                referrerPolicy="no-referrer"
-                sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-presentation"
-              />
-            )}
-            <ul className="room-members" aria-label={t("Students in this room")}>
-              {allMembers.map(([memberId, member]) => {
-                const self = memberId === live.selfId;
-                const hidden = hiddenMembers.includes(memberId);
-                return (
-                  <li className="room-member" key={memberId}>
-                    <div>
-                      <strong>{member.name}</strong>
-                      {self && <small> · {t("You")}</small>}
-                      <small> · {member.exam}</small>
-                      {hidden ? <p>{t("Chat hidden for you")}</p> : member.goal && <p>{member.goal}</p>}
-                    </div>
-                    {!self && !hidden && (
-                      <button
-                        className="icon-button"
-                        title={t("Hide this student's Padhai chat")}
-                        aria-label={t("Hide this student's Padhai chat") + " · " + member.name}
-                        onClick={() => setHiddenMembers((current) => [...current, memberId])}
-                      >
-                        <Flag size={13} />
-                      </button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
           </section>
 
           <form

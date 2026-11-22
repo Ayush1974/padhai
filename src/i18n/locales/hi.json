@@ -184,5 +184,11 @@
   "Chat hidden for you": "आपके लिए चैट छिपाई गई है",
   "Hide this student's Padhai chat": "इस विद्यार्थी की Padhai चैट छिपाएँ",
   "Turn off low-data mode in Settings to join the video call.": "वीडियो कॉल में जुड़ने के लिए सेटिंग में कम डेटा मोड बंद करें।",
-  "Choose the browser option in kMeet, then enter your name. Everyone in this study room joins the same call.": "kMeet में ब्राउज़र से जुड़ने का विकल्प चुनें और अपना नाम लिखें। इस अध्ययन कक्ष के सभी विद्यार्थी एक ही कॉल में जुड़ते हैं।"
+  "Choose the browser option in kMeet.": "kMeet में ब्राउज़र से जुड़ने का विकल्प चुनें।",
+  "Your Padhai name will be filled in.": "आपका Padhai नाम अपने-आप भर जाएगा।",
+  "Copy my name": "मेरा नाम कॉपी करें",
+  "Copy your Padhai name and paste it into kMeet.": "अपना Padhai नाम कॉपी करके kMeet में पेस्ट करें।",
+  "Name copied. Paste it into kMeet.": "नाम कॉपी हो गया। इसे kMeet में पेस्ट करें।",
+  "Copying was blocked. Type your name in kMeet.": "नाम कॉपी नहीं हो सका। kMeet में अपना नाम लिखें।",
+  "For quiet audio, check your speakers under Settings → Audio in kMeet.": "अगर आवाज़ धीमी है, तो kMeet में सेटिंग → ऑडियो खोलकर अपना स्पीकर जाँचें।"
 }

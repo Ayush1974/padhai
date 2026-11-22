@@ -349,10 +349,12 @@ test(
   async () => {
     const browser = await chromium.launch({ channel: "msedge", headless: true });
     const first = await browser.newContext({
+      viewport: { width: 1280, height: 900 },
       permissions: ["clipboard-read", "clipboard-write"],
     });
     const second = await browser.newContext({
       viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
+      permissions: ["clipboard-read", "clipboard-write"],
     });
     try {
       const vercel = JSON.parse(await readFile(new URL("../vercel.json", import.meta.url), "utf8"));
@@ -383,8 +385,8 @@ test(
       await a.getByRole("button", { name: "Copy invite link", exact: true }).click();
       assert.equal(await a.evaluate(() => navigator.clipboard.readText()), link);
       await a.getByRole("button", { name: "Close dialog", exact: true }).click();
-      await openWorkspace(b, "Second Student", link);
-      await a.locator(".room-member").filter({ hasText: "Second Student" }).waitFor();
+      await openWorkspace(b, "Second & Student", link);
+      await a.locator(".room-member").filter({ hasText: "Second & Student" }).waitFor();
       await b.locator(".room-member").filter({ hasText: "First Student" }).waitFor();
 
       await a.getByLabel("Message your study room", { exact: true }).fill("Ready to study GATE CS");
@@ -392,6 +394,9 @@ test(
       await b.locator(".chat-message").filter({ hasText: "Ready to study GATE CS" }).waitFor();
       await a.getByRole("button", { name: "Start together", exact: true }).click();
       await b.getByRole("button", { name: "Pause together", exact: true }).waitFor();
+      const rainfall = a.locator(".room-layout").getByRole("button", { name: "Rainfall", exact: true });
+      await rainfall.click();
+      assert.equal(await rainfall.getAttribute("aria-pressed"), "true");
 
       const urls = await Promise.all([a, b].map(async (page) => {
         await page.getByRole("button", { name: "Join video call", exact: true }).click();
@@ -401,13 +406,25 @@ test(
           camera: document.featurePolicy.allowsFeature("camera"),
           microphone: document.featurePolicy.allowsFeature("microphone"),
           screen: document.featurePolicy.allowsFeature("display-capture"),
-        })), { camera: true, microphone: true, screen: true });
+          speakers: document.featurePolicy.allowsFeature("speaker-selection"),
+        })), { camera: true, microphone: true, screen: true, speakers: true });
         assert.equal(page.url(), link);
         assert.equal(page.context().pages().length, 1);
-        return page.getByTitle("kMeet study call").getAttribute("src");
+        return new URL(await page.getByTitle("kMeet study call").getAttribute("src"));
       }));
-      assert.match(urls[0], /^https:\/\/kmeet\.infomaniak\.com\/[a-f0-9]{32}$/);
-      assert.equal(urls[1], urls[0]);
+      assert.match(urls[1].href, /^https:\/\/kmeet\.infomaniak\.com\/[a-f0-9]{32}$/);
+      assert.equal(urls[0].origin + urls[0].pathname, urls[1].href);
+      assert.equal(urls[0].search, "");
+      assert.deepEqual([...new URLSearchParams(urls[0].hash.slice(1))], [
+        ["userInfo.displayName", JSON.stringify("First Student")],
+      ]);
+      await b.getByRole("button", { name: "Copy my name", exact: true }).click();
+      assert.equal(await b.evaluate(() => navigator.clipboard.readText()), "Second & Student");
+      assert.equal(await rainfall.getAttribute("aria-pressed"), "false");
+      const desktopFrame = await a.getByTitle("kMeet study call").boundingBox();
+      const desktopLayout = await a.locator(".room-layout").boundingBox();
+      assert.ok(desktopFrame.width >= desktopLayout.width - 40,
+        "The embedded call should span the room on desktop");
 
       await b.getByRole("button", { name: "Close video call", exact: true }).click();
       await b.getByTitle("kMeet study call").waitFor({ state: "detached" });
@@ -415,13 +432,16 @@ test(
       await b.getByRole("button", { name: "Join video call", exact: true }).click();
       const embeddedCall = b.getByTitle("kMeet study call");
       await embeddedCall.waitFor();
-      assert.equal(await embeddedCall.getAttribute("src"), urls[0]);
+      assert.equal(await embeddedCall.getAttribute("src"), urls[1].href);
 
       for (const width of [320, 360, 390]) {
         await b.setViewportSize({ width, height: 680 });
         const frameBounds = await embeddedCall.boundingBox();
         assert.ok(frameBounds.x >= 0 && frameBounds.x + frameBounds.width <= width,
           `The embedded call overflows at ${width}px`);
+        const mobileLayout = await b.locator(".room-layout").boundingBox();
+        assert.ok(frameBounds.width >= mobileLayout.width - 22,
+          `The embedded call should fill the room at ${width}px`);
         const widgets = b.locator(".room-layout .study-widgets");
         const cards = await widgets.evaluate((aside) => {
           const timer = aside.querySelector(".timer-panel").getBoundingClientRect();
