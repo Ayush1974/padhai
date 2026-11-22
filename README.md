@@ -18,7 +18,7 @@ A free, open-source study companion for Indian students. Built with ❤️ by Ay
 
 ## Screenshot tour
 
-These Microsoft Edge screenshots show a sample GATE CS workspace in light and dark mode.
+These Microsoft Edge screenshots show Padhai in light and dark mode. The first eight use a sample GATE CS workspace.
 
 ### 1. Find a room or study on your own
 
@@ -67,6 +67,12 @@ Open **Daily foundations** and scroll to **My daily journal**. Write down today'
 Open **A little wisdom**, choose **Daily shloka** or **Daily chaupai**, and pick the language for the explanation. Follow the Heritage IIT Kanpur link to read the original. The example below uses Hindi.
 
 ![Dark-mode Wisdom page with Bhagavad Gita 2.47 in Sanskrit, an original-source link, and a sample Hindi explanation](docs/screenshots/08-daily-wisdom.png)
+
+### 9. Explore the study rooms in dark mode
+
+Scroll down in **Study rooms** to find **The Night Owls** or create a room for your group. Select **Ask AI** for help explaining a topic or planning your next session.
+
+![Padhai in dark mode showing The Night Owls study room, Create a room, and Ask AI](docs/screenshots/09-study-rooms-dark-mode.png)
 
 ## Privacy and recovery
 
