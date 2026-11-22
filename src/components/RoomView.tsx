@@ -250,15 +250,17 @@ export function RoomView({
           </section>
 
           <p className="room-connection-note" role="status">{t(live.mediaStatus)}</p>
-          <section className="room-stage" aria-label={t("Study participants")}>
+          <section className="room-stage" aria-label={t("Live study group")}>
             <div className="stage-heading">
               <span>
                 <Users size={16} />
-                {t(" Your focus crew")}
+                {t(" Live study group")}
               </span>
               <span className="tiny">
                 {t(
-                  profile.lowData ? "LOW DATA MODE" : "A LITTLE COMPANY HELPS",
+                  profile.lowData
+                    ? "LOW DATA MODE"
+                    : "Everyone can turn on their camera and speak at the same time.",
                 )}
               </span>
             </div>
@@ -266,6 +268,7 @@ export function RoomView({
               {t(
                 allMembers.map(([userId, member]) => {
                   const self = userId === live.selfId;
+                  const cameraStatus = self ? "Camera off" : "No video yet";
                   const camera = self
                     ? live.localStreams.camera
                     : live.streams.find(
@@ -291,7 +294,7 @@ export function RoomView({
                               {t(
                                 live.blocked.includes(userId)
                                   ? "Hidden for you"
-                                  : member.goal || "One page at a time.",
+                                  : member.goal || cameraStatus,
                               )}
                             </span>
                           </div>

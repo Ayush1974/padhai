@@ -343,7 +343,7 @@ test(
 );
 
 test(
-  "room invite, live video and audio, chat and shared clock work without public signaling relays",
+  "three students can share cameras and microphones together in a live study room",
   { timeout: 110000 },
   async () => {
     const browser = await chromium.launch({
@@ -365,10 +365,12 @@ test(
     const second = await browser.newContext({
       permissions: ["camera", "microphone"],
     });
-    await first.routeWebSocket("**/*", (socket) => socket.close());
-    await second.routeWebSocket("**/*", (socket) => socket.close());
+    const third = await browser.newContext({
+      permissions: ["camera", "microphone"],
+    });
     const statuses = [];
-    for (const context of [first, second]) {
+    for (const context of [first, second, third]) {
+      await context.routeWebSocket("**/*", (socket) => socket.close());
       await context.addInitScript(() => {
         const devices = navigator.mediaDevices;
         const capture = devices.getUserMedia.bind(devices);
@@ -405,6 +407,7 @@ test(
     try {
       const a = await first.newPage();
       const b = await second.newPage();
+      const c = await third.newPage();
       await openWorkspace(a, "First Student");
       await a
         .getByRole("button", { name: "Create a room", exact: true })
@@ -441,6 +444,12 @@ test(
         .locator(".participant-label")
         .filter({ hasText: "First Student" })
         .waitFor({ timeout: 10000 });
+      const firstTile = b.locator(".participant").filter({
+        has: b.getByText("First Student", { exact: true }),
+      });
+      await b.getByRole("region", { name: "Live study group" }).waitFor();
+      await firstTile.getByText("No video yet", { exact: true }).waitFor();
+      await b.locator(".participant.is-you").getByText("Camera off", { exact: true }).waitFor();
       await a
         .getByLabel("Message your study room", { exact: true })
         .fill("Ready to study GATE CS");
@@ -478,24 +487,28 @@ test(
         await page.getByRole("button", { name: "Turn camera on", exact: true }).click();
         await page.getByRole("button", { name: "Turn microphone on", exact: true }).click();
       }
+      await openWorkspace(c, "Third Student", link);
+      await c.getByRole("button", { name: "Turn camera on", exact: true }).click();
+      await c.getByRole("button", { name: "Turn microphone on", exact: true }).click();
       try {
-        await Promise.all([a, b].map(async (page) => {
+        await Promise.all([a, b, c].map(async (page) => {
           await page.waitForFunction(async () => {
-            const camera = document.querySelector(".participant:not(.is-you) video");
-            const audio = document.querySelector(".audio-only");
-            const playing = camera?.videoWidth > 0 && camera.readyState >= 2 &&
-              !audio?.paused && !audio?.muted &&
-              audio?.srcObject?.getAudioTracks().some((track) => !track.muted && track.readyState === "live");
+            const cameras = [...document.querySelectorAll(".participant:not(.is-you) video")];
+            const microphones = [...document.querySelectorAll(".audio-only")];
+            const playing = cameras.length === 2 && microphones.length === 2 &&
+              cameras.every((video) => video.videoWidth > 0 && video.readyState >= 2) &&
+              microphones.every((audio) => !audio.paused && !audio.muted &&
+                audio.srcObject?.getAudioTracks().some((track) => !track.muted && track.readyState === "live"));
             if (!playing) return false;
             const peers = window.testRoomPeers.filter((peer) => peer.connectionState === "connected");
             const reports = await Promise.all(peers.map((peer) => peer.getStats()));
-            return reports.some((stats) => [...stats.values()].some((report) =>
+            return reports.filter((stats) => [...stats.values()].some((report) =>
               report.type === "inbound-rtp" && report.kind === "audio" && report.packetsReceived > 0,
-            ));
+            )).length === 2;
           }, undefined, { timeout: 20000 });
         }));
       } catch (error) {
-        const diagnostics = await Promise.all([a, b].map((page) => page.evaluate(async () => {
+        const diagnostics = await Promise.all([a, b, c].map((page) => page.evaluate(async () => {
           const peers = await Promise.all(window.testRoomPeers.map(async (peer) => ({
             connection: peer.connectionState, ice: peer.iceConnectionState,
             tracks: peer.getTransceivers().map(({ currentDirection, sender, receiver }) => ({
@@ -511,16 +524,26 @@ test(
         throw new Error(JSON.stringify({ statuses, diagnostics }), { cause: error });
       }
       await a.getByRole("button", { name: "Mute room audio", exact: true }).click();
-      await a.waitForFunction(() => document.querySelector(".audio-only")?.muted);
+      await a.waitForFunction(() => {
+        const microphones = [...document.querySelectorAll(".audio-only")];
+        return microphones.length === 2 && microphones.every((audio) => audio.muted);
+      });
       await a.getByRole("button", { name: "Unmute room audio", exact: true }).click();
       await a.waitForFunction(() => {
-        const audio = document.querySelector(".audio-only");
-        return audio && !audio.paused && !audio.muted;
+        const microphones = [...document.querySelectorAll(".audio-only")];
+        return microphones.length === 2 && microphones.every((audio) => !audio.paused && !audio.muted);
       });
       await a.getByRole("button", { name: "Turn camera off", exact: true }).click();
-      await b.locator(".participant:not(.is-you) video").waitFor({ state: "detached", timeout: 10000 });
+      await firstTile.locator("video").waitFor({ state: "detached", timeout: 10000 });
+      await firstTile.getByText("No video yet", { exact: true }).waitFor();
+      await b.locator(".participant").filter({
+        has: b.getByText("Third Student", { exact: true }),
+      }).locator("video").waitFor({ state: "visible", timeout: 10000 });
       await a.getByRole("button", { name: "Turn camera on", exact: true }).click();
-      await b.waitForFunction(() => document.querySelector(".participant:not(.is-you) video")?.videoWidth > 0);
+      await b.waitForFunction(() => {
+        const cameras = [...document.querySelectorAll(".participant:not(.is-you) video")];
+        return cameras.length === 2 && cameras.every((camera) => camera.videoWidth > 0);
+      });
 
       for (const width of [320, 360, 390]) {
         await b.setViewportSize({ width, height: 680 });
@@ -552,6 +575,7 @@ test(
     } finally {
       await first.close();
       await second.close();
+      await third.close();
       await browser.close();
     }
   },
